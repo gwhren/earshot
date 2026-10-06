@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-linux:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: swift test
+
+  app-macos:
+    name: App build (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Toolchain
+        run: swift --version
+      - name: Unit tests
+        run: swift test
+      - name: Build Earshot.app
+        run: ./scripts/build-app.sh
+      - name: End-to-end check against a fake MLX Studio
+        run: ./scripts/e2e-cli.sh
+      - name: Package
+        run: ditto -c -k --keepParent build/Earshot.app build/Earshot.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Earshot-app
+          path: build/Earshot.zip
+          retention-days: 14
